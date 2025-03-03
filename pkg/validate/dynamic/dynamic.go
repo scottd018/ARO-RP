@@ -255,9 +255,6 @@ func (dv *dynamic) validateVnetPermissions(ctx context.Context, vnet azure.Resou
 		"Microsoft.Network/virtualNetworks/join/action",
 		"Microsoft.Network/virtualNetworks/read",
 		"Microsoft.Network/virtualNetworks/write",
-		// "Microsoft.Network/virtualNetworks/subnets/join/action",
-		// "Microsoft.Network/virtualNetworks/subnets/read",
-		// "Microsoft.Network/virtualNetworks/subnets/write",
 	})
 
 	var noPermissionsErr *api.CloudError
@@ -327,10 +324,26 @@ func (dv *dynamic) validateSubnetPermissions(ctx context.Context, s Subnet) erro
 		return err
 	}
 
+	vnetID, _, err := apisubnet.Split(s.ID)
+	if err != nil {
+		return err
+	}
+
+	vnetr, err := azure.ParseResourceID(vnetID)
+	if err != nil {
+		return err
+	}
+
+	// we need to explicitly set the resource type to virtualNetworks/{vnetID}/subnets, as the
+	// ParseResourceID function does not properly handle parsing child resources (e.g.
+	// VNET = parent, subnet = child) and gives the incorrect resource type, effectively
+	// giving the incorrect resource ID which causes the validateActions method to fail.
+	subnetr.ResourceType += fmt.Sprintf("/%s/%s", vnetr.ResourceName, "subnets")
+
 	operatorName, err := dv.validateActions(ctx, &subnetr, []string{
 		"Microsoft.Network/virtualNetworks/subnets/join/action",
 		"Microsoft.Network/virtualNetworks/subnets/read",
-		// "Microsoft.Network/virtualNetworks/subnets/write",
+		"Microsoft.Network/virtualNetworks/subnets/write",
 	})
 
 	var noPermissionsErr *api.CloudError
